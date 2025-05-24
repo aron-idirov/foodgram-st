@@ -1,0 +1,11 @@
+djangorestframework
+djoser
+django-filter
+psycopg2-binary
+Pillow
+gunicorn
+
+# Для разработки
+pytest
+pytest-django
+django-debug-toolbar
