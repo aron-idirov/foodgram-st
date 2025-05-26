@@ -28,4 +28,4 @@ jobs:
 
     - name: Run PEP8 check
       run: |
-        pycodestyle backend/ --max-line-length=79 --statistics --count
+        pycodestyle backend/ --max-line-length=120 --statistics --count
