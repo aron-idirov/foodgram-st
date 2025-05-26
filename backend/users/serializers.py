@@ -2,10 +2,13 @@ from rest_framework import serializers
 from djoser.serializers import UserCreateSerializer, UserSerializer
 from .models import User, Subscription
 
+
 class CustomUserCreateSerializer(UserCreateSerializer):
     class Meta(UserCreateSerializer.Meta):
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'password')
+        fields = ('id', 'email', 'username',
+                  'first_name', 'last_name', 'password')
+
 
 class CustomUserSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField()
@@ -13,13 +16,15 @@ class CustomUserSerializer(UserSerializer):
 
     class Meta(UserSerializer.Meta):
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'avatar', 'is_subscribed')
+        fields = ('id', 'email', 'username', 'first_name',
+                  'last_name', 'avatar', 'is_subscribed')
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request', None)
         if request is None or not hasattr(request, 'user') or request.user.is_anonymous:
             return False
         return Subscription.objects.filter(user=request.user, author=obj).exists()
+
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source='author.id')
@@ -34,7 +39,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Subscription
-        fields = ('id', 'username', 'first_name', 'last_name', 'email', 'avatar', 'is_subscribed', 'recipes', 'recipes_count')
+        fields = ('id', 'username', 'first_name', 'last_name', 'email',
+                  'avatar', 'is_subscribed', 'recipes', 'recipes_count')
 
     def get_recipes(self, obj):
         from recipes.serializers import RecipeSerializer
@@ -47,9 +53,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_recipes_count(self, obj):
         return obj.author.recipes.count()
-    
+
     def get_is_subscribed(self, obj):
         return True
+
 
 class SubscriptionCreateSerializer(serializers.ModelSerializer):
     class Meta:

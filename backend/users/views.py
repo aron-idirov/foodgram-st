@@ -12,6 +12,7 @@ from .models import User, Subscription
 from .serializers import CustomUserSerializer, SubscriptionSerializer, SubscriptionCreateSerializer
 from recipes.serializers import RecipeSerializer
 
+
 class UserViewSet(DjoserUserViewSet):
     queryset = User.objects.all()
     serializer_class = CustomUserSerializer
@@ -36,28 +37,31 @@ class UserViewSet(DjoserUserViewSet):
             if Subscription.objects.filter(user=user, author=author).exists():
                 return Response({'error': 'Подписка уже существует'}, status=status.HTTP_400_BAD_REQUEST)
             Subscription.objects.create(user=user, author=author)
-            serializer = CustomUserSerializer(author, context={'request': request})
+            serializer = CustomUserSerializer(
+                author, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         elif request.method == 'DELETE':
-            subscription = Subscription.objects.filter(user=user, author=author)
+            subscription = Subscription.objects.filter(
+                user=user, author=author)
             if subscription.exists():
                 subscription.delete()
                 return Response({'success': 'Подписка удалена'}, status=status.HTTP_204_NO_CONTENT)
             return Response({'error': 'Подписка не найдена'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated],     url_path='subscriptions')
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='subscriptions')
     def subscriptions(self, request):
         queryset = Subscription.objects.filter(user=request.user)
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = SubscriptionSerializer(page, many=True, context={'request': request})
+            serializer = SubscriptionSerializer(
+                page, many=True, context={'request': request})
             return self.get_paginated_response(serializer.data)
-        serializer = SubscriptionSerializer(queryset, many=True, context={'request': request})
+        serializer = SubscriptionSerializer(
+            queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
-
-    @action(detail=False, methods=['get', 'post', 'patch', 'put', 'delete'],     url_path='me/avatar', permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get', 'post', 'patch', 'put', 'delete'], url_path='me/avatar', permission_classes=[IsAuthenticated])
     def avatar(self, request):
         user = request.user
 
@@ -68,7 +72,8 @@ class UserViewSet(DjoserUserViewSet):
             try:
                 format, imgstr = image_data.split(';base64,')
                 ext = format.split('/')[-1]
-                data = ContentFile(base64.b64decode(imgstr), name=f"{uuid.uuid4().hex}.{ext}")
+                data = ContentFile(base64.b64decode(imgstr),
+                                   name=f"{uuid.uuid4().hex}.{ext}")
                 user.avatar.save(data.name, data, save=True)
                 return Response({'avatar': request.build_absolute_uri(user.avatar.url)}, status=status.HTTP_200_OK)
             except Exception as e:
@@ -84,6 +89,7 @@ class UserViewSet(DjoserUserViewSet):
             return Response({'avatar': None})
 
         return Response({'message': 'Метод не разрешён'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
 
 class SubscriptionViewSet(mixins.CreateModelMixin,
                           mixins.ListModelMixin,

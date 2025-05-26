@@ -9,9 +9,11 @@ from django.db.models import Q
 from .models import Recipe, Favorite, ShoppingCart
 from .serializers import RecipeSerializer, FavoriteSerializer, ShoppingCartSerializer
 
+
 class IsAuthorOrReadOnly(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return request.method in permissions.SAFE_METHODS or obj.author == request.user
+
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
@@ -25,7 +27,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Recipe.objects.all()
         user = self.request.user
-        is_in_shopping_cart = self.request.query_params.get('is_in_shopping_cart')
+        is_in_shopping_cart = self.request.query_params.get(
+            'is_in_shopping_cart')
         is_favorited = self.request.query_params.get('is_favorited')
 
         if user.is_authenticated:
@@ -48,7 +51,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         if not self.request.user or not self.request.user.is_authenticated:
-            raise PermissionDenied('Неавторизованный пользователь не может создавать рецепты.')
+            raise PermissionDenied(
+                'Неавторизованный пользователь не может создавать рецепты.')
         serializer.save(author=self.request.user)
 
     def destroy(self, request, *args, **kwargs):
@@ -73,7 +77,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             ShoppingCart.objects.create(user=request.user, recipe=recipe)
             return Response({'success': 'Рецепт добавлен'}, status=status.HTTP_201_CREATED)
         elif request.method == 'DELETE':
-            cart_item = ShoppingCart.objects.filter(user=request.user, recipe=recipe)
+            cart_item = ShoppingCart.objects.filter(
+                user=request.user, recipe=recipe)
             if cart_item.exists():
                 cart_item.delete()
                 return Response({'success': 'Рецепт удалён'}, status=status.HTTP_204_NO_CONTENT)
@@ -85,7 +90,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         shopping_cart_items = ShoppingCart.objects.filter(user=request.user)
 
         # Словарь для подсчёта ингредиентов
-        ingredient_summary = defaultdict(lambda: {'amount': 0, 'measurement_unit': ''})
+        ingredient_summary = defaultdict(
+            lambda: {'amount': 0, 'measurement_unit': ''})
 
         # Проходим по каждому рецепту в корзине
         for item in shopping_cart_items:
@@ -124,7 +130,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response({'success': 'Рецепт добавлен в избранное'}, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            favorite_item = Favorite.objects.filter(user=request.user, recipe=recipe)
+            favorite_item = Favorite.objects.filter(
+                user=request.user, recipe=recipe)
             if favorite_item.exists():
                 favorite_item.delete()
                 return Response({'success': 'Рецепт удалён из избранного'}, status=status.HTTP_204_NO_CONTENT)
