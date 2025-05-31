@@ -88,7 +88,7 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer):
         if user == author:
             raise serializers.ValidationError("Нельзя подписаться на себя.")
 
-        if Subscription.objects.filter(user=user, author=author).exists():
+        if author.subscribers_set.filter(user=user).exists():
             raise serializers.ValidationError("Подписка уже существует.")
 
         return data
