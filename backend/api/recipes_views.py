@@ -6,6 +6,7 @@ from rest_framework.permissions import (
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
+from .permissions import IsAuthorOrReadOnly
 from collections import defaultdict
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -16,11 +17,6 @@ from .recipes_serializers import (
     FavoriteSerializer,
     ShoppingCartSerializer,
 )
-
-
-class IsAuthorOrReadOnly(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return request.method in permissions.SAFE_METHODS or obj.author == request.user
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
