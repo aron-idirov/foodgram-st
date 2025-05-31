@@ -89,7 +89,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         return data
 
     def _create_ingredients(self, recipe, ingredients_data):
-        IngredientRecipe.objects.filter(recipe=recipe).delete()
+        recipe.ingredient_recipes.all().delete()
         for ingredient_data in ingredients_data:
             IngredientRecipe.objects.create(
                 recipe=recipe,
