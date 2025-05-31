@@ -8,13 +8,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import filters
 from djoser.views import UserViewSet as DjoserUserViewSet
-from .models import User, Subscription
-from .serializers import (
+from users.models import User, Subscription
+from .users_serializers import (
     CustomUserSerializer,
     SubscriptionSerializer,
     SubscriptionCreateSerializer,
 )
-from recipes.serializers import RecipeSerializer
+from .recipes_serializers import RecipeSerializer
 
 
 class UserViewSet(DjoserUserViewSet):
@@ -43,22 +43,16 @@ class UserViewSet(DjoserUserViewSet):
         author = get_object_or_404(User, id=id)
 
         if request.method == "POST":
-            if user == author:
-                return Response(
-                    {"error": "Нельзя подписаться на себя"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if Subscription.objects.filter(user=user, author=author).exists():
-                return Response(
-                    {"error": "Подписка уже существует"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            Subscription.objects.create(user=user, author=author)
-            serializer = CustomUserSerializer(author, context={"request": request})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            serializer = SubscriptionCreateSerializer(
+                data={"author": author.id}, context={"request": request}
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=user, author=author)
+            user_serializer = CustomUserSerializer(author, context={"request": request})
+            return Response(user_serializer.data, status=status.HTTP_201_CREATED)
 
         elif request.method == "DELETE":
-            subscription = Subscription.objects.filter(user=user, author=author)
+            subscription = author.subscribers_set.filter(user=user)
             if subscription.exists():
                 subscription.delete()
                 return Response(
@@ -75,7 +69,7 @@ class UserViewSet(DjoserUserViewSet):
         url_path="subscriptions",
     )
     def subscriptions(self, request):
-        queryset = Subscription.objects.filter(user=request.user)
+        queryset = request.user.subscriptions_set.all()
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = SubscriptionSerializer(
@@ -140,7 +134,7 @@ class SubscriptionViewSet(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Subscription.objects.filter(user=self.request.user)
+        return self.request.user.subscriptions_set.all()
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -153,9 +147,7 @@ class SubscriptionViewSet(
             raise serializers.ValidationError("Поле 'author' обязательно.")
         if int(author_id) == self.request.user.id:
             raise serializers.ValidationError("Нельзя подписаться на себя.")
-        if Subscription.objects.filter(
-            user=self.request.user, author_id=author_id
-        ).exists():
+        if self.request.user.subscriptions_set.filter(author_id=author_id).exists():
             raise serializers.ValidationError("Подписка уже существует.")
         try:
             author = User.objects.get(id=author_id)
