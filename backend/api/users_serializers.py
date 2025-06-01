@@ -29,6 +29,8 @@ class CustomUserSerializer(UserSerializer):
         request = self.context.get("request", None)
         if request is None or not hasattr(request, "user") or request.user.is_anonymous:
             return False
+        if request.user.id == obj.id:
+            return False
         return obj.subscribers_set.filter(user=request.user).exists()
 
 
@@ -58,14 +60,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         )
 
     def get_recipes(self, obj):
-        from .recipes_serializers import RecipeSerializer
+        from .recipes_serializers import ShortRecipeSerializer
 
         request = self.context.get("request")
         recipes_limit = request.query_params.get("recipes_limit")
         recipes_qs = obj.author.recipes.all()
         if recipes_limit:
             recipes_qs = recipes_qs[: int(recipes_limit)]
-        return RecipeSerializer(
+        return ShortRecipeSerializer(
             recipes_qs, many=True, context={"request": request}
         ).data
 
@@ -88,7 +90,7 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer):
         if user == author:
             raise serializers.ValidationError("Нельзя подписаться на себя.")
 
-        if Subscription.objects.filter(user=user, author=author).exists():
+        if author.subscribers_set.filter(user=user).exists():
             raise serializers.ValidationError("Подписка уже существует.")
 
         return data

@@ -22,8 +22,8 @@ class UserViewSet(DjoserUserViewSet):
     serializer_class = CustomUserSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["username", "email"]
-    lookup_field = "id"  # Используем id вместо pk
-    lookup_url_kwarg = "id"  # URL-параметр будет называться id
+    lookup_field = "id"
+    lookup_url_kwarg = "id"
 
     @action(
         detail=False,
@@ -32,7 +32,10 @@ class UserViewSet(DjoserUserViewSet):
         url_path="me",
     )
     def me(self, request):
-        serializer = self.get_serializer(request.user)
+        user = request.user
+        from .users_serializers import CustomUserSerializer
+
+        serializer = CustomUserSerializer(user, context={"request": request})
         return Response(serializer.data)
 
     @action(
@@ -47,9 +50,17 @@ class UserViewSet(DjoserUserViewSet):
                 data={"author": author.id}, context={"request": request}
             )
             serializer.is_valid(raise_exception=True)
-            serializer.save(user=user, author=author)
-            user_serializer = CustomUserSerializer(author, context={"request": request})
-            return Response(user_serializer.data, status=status.HTTP_201_CREATED)
+            subscription, created = Subscription.objects.get_or_create(
+                user=user, author=author
+            )
+
+            subscription_serializer = SubscriptionSerializer(
+                subscription, context={"request": request}
+            )
+
+            return Response(
+                subscription_serializer.data, status=status.HTTP_201_CREATED
+            )
 
         elif request.method == "DELETE":
             subscription = author.subscribers_set.filter(user=user)
@@ -116,7 +127,7 @@ class UserViewSet(DjoserUserViewSet):
 
         elif request.method == "DELETE":
             user.avatar.delete(save=True)
-            return Response({"success": "Аватар удалён"})
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         elif request.method == "GET":
             if user.avatar:
@@ -127,30 +138,26 @@ class UserViewSet(DjoserUserViewSet):
             {"message": "Метод не разрешён"}, status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
+    class SubscriptionViewSet(
+        mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+    ):
+        permission_classes = [IsAuthenticated]
 
-class SubscriptionViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
-):
-    permission_classes = [IsAuthenticated]
+        def get_queryset(self):
+            return self.request.user.subscriptions_set.all()
 
-    def get_queryset(self):
-        return self.request.user.subscriptions_set.all()
+        def get_serializer_class(self):
+            if self.action == "create":
+                return SubscriptionCreateSerializer
+            return SubscriptionSerializer
 
-    def get_serializer_class(self):
-        if self.action == "create":
-            return SubscriptionCreateSerializer
-        return SubscriptionSerializer
-
-    def perform_create(self, serializer):
-        author_id = self.request.data.get("author")
-        if not author_id:
-            raise serializers.ValidationError("Поле 'author' обязательно.")
-        if int(author_id) == self.request.user.id:
-            raise serializers.ValidationError("Нельзя подписаться на себя.")
-        if self.request.user.subscriptions_set.filter(author_id=author_id).exists():
-            raise serializers.ValidationError("Подписка уже существует.")
-        try:
-            author = User.objects.get(id=author_id)
-        except User.DoesNotExist:
-            raise serializers.ValidationError("Такой автор не существует.")
-        serializer.save(user=self.request.user, author=author)
+        def perform_create(self, serializer):
+            author_id = self.request.data.get("author")
+            if not author_id:
+                raise serializers.ValidationError("Поле 'author' обязательно.")
+            if int(author_id) == self.request.user.id:
+                raise serializers.ValidationError("Нельзя подписаться на себя.")
+            if self.request.user.subscriptions_set.filter(author_id=author_id).exists():
+                raise serializers.ValidationError("Подписка уже существует.")
+            author = get_object_or_404(User, id=author_id)
+            serializer.save(user=self.request.user, author=author)

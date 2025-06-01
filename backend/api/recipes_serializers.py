@@ -48,7 +48,6 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     image = Base64ImageField(required=True)
     ingredients = IngredientInRecipeSerializer(source="ingredient_recipes", many=True)
-    tags = TagSerializer(many=True, read_only=True)
     author = CustomUserSerializer(read_only=True)
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
@@ -58,7 +57,17 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
-        fields = "__all__"
+        fields = [
+            "id",
+            "author",
+            "ingredients",
+            "is_favorited",
+            "is_in_shopping_cart",
+            "name",
+            "image",
+            "text",
+            "cooking_time",
+        ]
 
     def validate(self, data):
         ingredients_data = self.initial_data.get("ingredients", [])
@@ -89,7 +98,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         return data
 
     def _create_ingredients(self, recipe, ingredients_data):
-        IngredientRecipe.objects.filter(recipe=recipe).delete()
+        recipe.ingredient_recipes.all().delete()
         for ingredient_data in ingredients_data:
             IngredientRecipe.objects.create(
                 recipe=recipe,
@@ -144,17 +153,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         return obj.in_shopping_cart.filter(user=user).exists()
 
 
-class ShoppingCartSerializer(serializers.ModelSerializer):
-    recipe = RecipeSerializer(read_only=True)
-
+class ShortRecipeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ShoppingCart
-        fields = ("id", "recipe", "created_at")
-
-
-class FavoriteSerializer(serializers.ModelSerializer):
-    recipe = RecipeSerializer(read_only=True)
-
-    class Meta:
-        model = Favorite
-        fields = ("id", "recipe", "created_at")
+        model = Recipe
+        fields = ("id", "name", "image", "cooking_time")

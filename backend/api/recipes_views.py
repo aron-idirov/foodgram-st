@@ -6,21 +6,13 @@ from rest_framework.permissions import (
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
+from .permissions import IsAuthorOrReadOnly
 from collections import defaultdict
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum, F
 from recipes.models import Recipe, Favorite, ShoppingCart, IngredientRecipe
-from .recipes_serializers import (
-    RecipeSerializer,
-    FavoriteSerializer,
-    ShoppingCartSerializer,
-)
-
-
-class IsAuthorOrReadOnly(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        return request.method in permissions.SAFE_METHODS or obj.author == request.user
+from .recipes_serializers import RecipeSerializer, ShortRecipeSerializer
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -37,6 +29,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         user = self.request.user
         is_in_shopping_cart = self.request.query_params.get("is_in_shopping_cart")
         is_favorited = self.request.query_params.get("is_favorited")
+        author_id = self.request.query_params.get("author")
+
+        if author_id:
+            queryset = queryset.filter(author__id=author_id)
 
         if user.is_authenticated:
             if is_in_shopping_cart in ["true", "True", "1"]:
@@ -77,9 +73,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             ShoppingCart.objects.create(user=request.user, recipe=recipe)
-            return Response(
-                {"success": "Рецепт добавлен"}, status=status.HTTP_201_CREATED
-            )
+            serializer = ShortRecipeSerializer(recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         elif request.method == "DELETE":
             cart_item = recipe.in_shopping_cart.filter(user=request.user)
             if cart_item.exists():
@@ -94,10 +90,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def download_shopping_cart(self, request):
-        # Получаем все покупки пользователя
         shopping_cart_items = ShoppingCart.objects.filter(user=request.user)
 
-        # Словарь для подсчёта ингредиентов
         ingredient_summary = defaultdict(lambda: {"amount": 0, "measurement_unit": ""})
 
         ingredient_summary = (
@@ -124,7 +118,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def view_shopping_cart(self, request):
         items = request.user.shopping_cart.all().order_by("id")
-        serializer = ShoppingCartSerializer(items, many=True)
+        serializer = ShortRecipeSerializer(items, many=True)
         return Response(serializer.data)
 
     @action(
@@ -140,8 +134,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             Favorite.objects.create(user=request.user, recipe=recipe)
+            serializer = ShortRecipeSerializer(recipe)
             return Response(
-                {"success": "Рецепт добавлен в избранное"},
+                serializer.data,
                 status=status.HTTP_201_CREATED,
             )
 
@@ -164,4 +159,4 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_link(self, request, pk=None):
         recipe = get_object_or_404(Recipe, pk=pk)
         short_link = f"https://foodgram.com/r/{recipe.pk}"
-        return Response({"link": short_link})
+        return Response({"short-link": short_link})
